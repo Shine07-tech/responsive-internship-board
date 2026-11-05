@@ -1,0 +1,731 @@
+
+/* =========================================
+   INTERNHUB - RESPONSIVE INTERNSHIP BOARD
+   ========================================= */
+
+/* 1. Global Settings */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 90px;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ffffff;
+    color: #172554;
+    line-height: 1.6;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+button,
+a,
+select {
+    -webkit-tap-highlight-color: transparent;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 3px solid #60a5fa;
+    outline-offset: 3px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* 2. Navigation Bar */
+
+.navbar {
+    background: #ffffff;
+    border-bottom: 1px solid #e5eaf3;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 18px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.logo {
+    font-size: 25px;
+    font-weight: 800;
+    color: #172554;
+    letter-spacing: -1px;
+}
+
+.logo span {
+    color: #2563eb;
+}
+
+.nav-container nav {
+    display: flex;
+    align-items: center;
+    gap: 35px;
+}
+
+.nav-container nav a {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    transition: color 0.3s;
+}
+
+.nav-container nav a:hover {
+    color: #2563eb;
+}
+
+.nav-button {
+    background: #2563eb;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.nav-button:hover {
+    background: #1d4ed8;
+}
+
+/* 3. Hero Section */
+
+.hero {
+    background: linear-gradient(120deg, #eff6ff, #f8faff);
+    min-height: 440px;
+    padding: 75px 8%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 50px;
+}
+
+.hero-content {
+    max-width: 590px;
+}
+
+.eyebrow {
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    display: inline-block;
+    margin-bottom: 16px;
+}
+
+.hero h1 {
+    font-size: clamp(36px, 5vw, 58px);
+    line-height: 1.13;
+    letter-spacing: -2px;
+    color: #172554;
+    margin-bottom: 20px;
+}
+
+.hero h1 span {
+    color: #2563eb;
+}
+
+.hero-content p {
+    color: #64748b;
+    max-width: 480px;
+    font-size: 16px;
+    margin-bottom: 30px;
+}
+
+.primary-button {
+    display: inline-block;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 23px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.primary-button:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.hero-visual {
+    width: 340px;
+    height: 270px;
+    background: #dbeafe;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transform: rotate(2deg);
+}
+
+.hero-card {
+    background: white;
+    width: 250px;
+    min-height: 190px;
+    padding: 28px;
+    border-radius: 18px;
+    box-shadow: 0 15px 40px rgba(37, 99, 235, 0.12);
+    position: relative;
+    overflow: hidden;
+    transform: rotate(-2deg);
+}
+
+.hero-icon {
+    color: #2563eb;
+    font-size: 30px;
+}
+
+.hero-card h2 {
+    margin-top: 12px;
+    font-size: 21px;
+}
+
+.hero-card p {
+    color: #64748b;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+.hero-decoration {
+    width: 90px;
+    height: 90px;
+    background: #dbeafe;
+    border-radius: 50%;
+    position: absolute;
+    right: -25px;
+    bottom: -30px;
+}
+
+/* 4. Internship Section */
+
+.internship-section {
+    max-width: 1200px;
+    margin: auto;
+    padding: 85px 30px;
+}
+
+.section-heading {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.section-heading h2 {
+    font-size: 36px;
+    color: #172554;
+    margin-bottom: 10px;
+    letter-spacing: -1px;
+}
+
+.section-heading p {
+    color: #64748b;
+    font-size: 15px;
+}
+
+/* 5. Search and Filters */
+
+.filter-container {
+    background: #f8fafc;
+    border: 1px solid #e5eaf3;
+    border-radius: 14px;
+    padding: 22px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    align-items: end;
+    gap: 16px;
+    margin-bottom: 45px;
+}
+
+.search-box,
+.filter-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-box label,
+.filter-box label {
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.search-box input,
+.filter-box select,
+.form-group input {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    padding: 0 13px;
+    border: 1px solid #dbe2ec;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #172554;
+}
+
+.search-box input::placeholder {
+    color: #94a3b8;
+}
+
+.search-box input:focus,
+.filter-box select:focus,
+.form-group input:focus {
+    border-color: #2563eb;
+}
+
+.reset-button {
+    height: 46px;
+    padding: 0 17px;
+    background: white;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.reset-button:hover {
+    background: #eff6ff;
+}
+
+/* 6. Results Heading */
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 22px;
+}
+
+.results-header h3 {
+    font-size: 20px;
+    color: #172554;
+}
+
+.results-header span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+/* 7. Internship Cards */
+
+.internship-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.internship-card {
+    border: 1px solid #e5eaf3;
+    border-radius: 14px;
+    padding: 25px;
+    background: #ffffff;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.internship-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.company-icon {
+    width: 48px;
+    height: 48px;
+    background: #eff6ff;
+    color: #2563eb;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.mode-badge {
+    background: #ecfdf5;
+    color: #047857;
+    border-radius: 30px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.internship-card h3 {
+    font-size: 20px;
+    color: #172554;
+    margin-bottom: 7px;
+}
+
+.card-domain {
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.card-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 18px;
+}
+
+.skills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.skill-tag {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.card-bottom {
+    border-top: 1px solid #edf0f5;
+    padding-top: 17px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.openings-text {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.details-button {
+    background: #eff6ff;
+    color: #2563eb;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.details-button:hover {
+    background: #dbeafe;
+}
+
+/* 8. Loading, Empty and Error States */
+
+.status-message {
+    text-align: center;
+    padding: 45px 20px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e5eaf3;
+    border-radius: 12px;
+    margin-top: 15px;
+}
+
+.status-message h3 {
+    color: #172554;
+    margin: 12px 0 5px;
+}
+
+.empty-icon {
+    font-size: 40px;
+    color: #2563eb;
+}
+
+.error-state {
+    background: #fff7f7;
+    border-color: #fecaca;
+    color: #b91c1c;
+}
+
+.error-state button {
+    margin-top: 15px;
+    padding: 10px 18px;
+    border: none;
+    background: #dc2626;
+    color: white;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+/* 9. About Section */
+
+.about-section {
+    background: #f1f6ff;
+    text-align: center;
+    padding: 75px 25px;
+}
+
+.about-section h2 {
+    color: #172554;
+    font-size: 32px;
+    margin-bottom: 15px;
+}
+
+.about-section p {
+    max-width: 650px;
+    margin: auto;
+    color: #64748b;
+}
+
+/* 10. Dialogs */
+
+dialog {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    width: min(500px, calc(100% - 30px));
+    max-height: 85vh;
+    margin: auto;
+    color: #172554;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+}
+
+dialog::backdrop {
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.dialog-content {
+    position: relative;
+    padding: 32px;
+    overflow-y: auto;
+    max-height: 85vh;
+}
+
+.dialog-content h2 {
+    margin-bottom: 20px;
+    padding-right: 25px;
+}
+
+.close-button {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.dialog-content .primary-button {
+    margin-top: 20px;
+}
+
+/* 11. Application Form */
+
+.form-group {
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.form-group input {
+    height: 45px;
+}
+
+#applicationForm .primary-button {
+    width: 100%;
+}
+
+#applicationMessage {
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+/* 12. Footer */
+
+.footer {
+    background: #172554;
+    color: #cbd5e1;
+    padding: 28px 20px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.footer p + p {
+    margin-top: 5px;
+}
+
+/* 13. Tablet Responsive Layout */
+
+@media (max-width: 900px) {
+
+    .hero {
+        padding: 65px 5%;
+        gap: 25px;
+    }
+
+    .hero-visual {
+        width: 280px;
+        height: 240px;
+    }
+
+    .filter-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .internship-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* 14. Mobile Responsive Layout */
+
+@media (max-width: 600px) {
+
+    .nav-container {
+        padding: 15px 18px;
+        flex-wrap: wrap;
+    }
+
+    .logo {
+        font-size: 22px;
+    }
+
+    .nav-container nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        gap: 25px;
+    }
+
+    .nav-container nav a {
+        font-size: 13px;
+    }
+
+    .nav-button {
+        padding: 9px 12px;
+        font-size: 12px;
+    }
+
+    .hero {
+        padding: 55px 22px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 35px;
+    }
+
+    .hero h1 {
+        font-size: 40px;
+    }
+
+    .hero-visual {
+        width: 100%;
+        max-width: 340px;
+        align-self: center;
+    }
+
+    .internship-section {
+        padding: 60px 18px;
+    }
+
+    .section-heading h2 {
+        font-size: 29px;
+    }
+
+    .filter-container {
+        grid-template-columns: 1fr;
+        padding: 17px;
+        margin-bottom: 35px;
+    }
+
+    .reset-button {
+        width: 100%;
+    }
+
+    .results-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .internship-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .internship-card {
+        padding: 20px;
+    }
+
+    .about-section {
+        padding: 55px 20px;
+    }
+
+    .about-section h2 {
+        font-size: 26px;
+    }
+
+    .dialog-content {
+        padding: 25px 20px;
+    }
+}
+
+/* 15. Small Mobile Screens */
+
+@media (max-width: 360px) {
+
+    .hero h1 {
+        font-size: 34px;
+    }
+
+    .card-bottom {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .details-button {
+        width: 100%;
+    }
+}
