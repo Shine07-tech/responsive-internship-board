@@ -22,6 +22,24 @@ db.exec(`
   )
 `);
 
+// Create applications table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    internship_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    portfolio TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (internship_id)
+      REFERENCES internships(id)
+      ON DELETE CASCADE,
+
+    UNIQUE (internship_id, email)
+  )
+`);
+
 console.log("Database connected successfully!");
 
 module.exports = db;

@@ -1,10 +1,15 @@
 
 /* ==========================================
    INTERNHUB - INTERNSHIP BOARD
-   JavaScript Functionality
+   API Integrated JavaScript
    ========================================== */
 
-// 1. DOM Elements
+// 1. API Configuration
+
+const API_BASE_URL = "http://localhost:5000/api";
+
+
+// 2. DOM Elements
 
 const internshipList = document.getElementById("internshipList");
 const searchInput = document.getElementById("searchInput");
@@ -33,15 +38,13 @@ const applicationInternshipId =
 const applyButton = document.getElementById("applyButton");
 
 
-// 2. Application Data
+// 3. Application Data
 
 let internships = [];
 let selectedInternship = null;
 
-const APPLICATION_STORAGE_KEY = "internhub_applications";
 
-
-// 3. Escape HTML to safely display data
+// 4. Escape HTML
 
 function escapeHTML(value) {
     return String(value).replace(/[&<>"']/g, character => {
@@ -58,23 +61,7 @@ function escapeHTML(value) {
 }
 
 
-// 4. Create a predictable API-style response
-
-function createResponse(data, page = 1, limit = 10) {
-    return {
-        status: "success",
-        data: data,
-        pagination: {
-            page: page,
-            limit: limit,
-            total: data.length,
-            totalPages: Math.ceil(data.length / limit)
-        }
-    };
-}
-
-
-// 5. Fetch internship records from JSON
+// 5. Load Internships from Backend API
 
 async function loadInternships() {
 
@@ -87,25 +74,31 @@ async function loadInternships() {
 
     try {
 
-        const response = await fetch("data/internships.json");
+        const response = await fetch(
+            `${API_BASE_URL}/internships`
+        );
 
-        if (!response.ok) {
-            throw new Error("Unable to fetch internship records.");
+        const result = await response.json();
+
+        if (!response.ok || result.status !== "success") {
+            throw new Error(
+                result.message || "Unable to load internships."
+            );
         }
 
-        const jsonData = await response.json();
-
-        if (!Array.isArray(jsonData.internships)) {
-            throw new Error("Invalid internship data format.");
+        if (!Array.isArray(result.data)) {
+            throw new Error("Invalid internship data received.");
         }
 
-        const apiResponse = createResponse(jsonData.internships);
+        internships = result.data;
 
-        if (apiResponse.status !== "success") {
-            throw new Error("Internship data could not be loaded.");
-        }
-
-        internships = apiResponse.data;
+        // Ensure skills are always an array
+        internships = internships.map(internship => ({
+            ...internship,
+            skills: Array.isArray(internship.skills)
+                ? internship.skills
+                : []
+        }));
 
         loadingState.hidden = true;
 
@@ -113,27 +106,28 @@ async function loadInternships() {
 
     } catch (error) {
 
-        console.error("Loading error:", error.message);
+        console.error("API Loading Error:", error);
 
         loadingState.hidden = true;
         errorState.hidden = false;
+        emptyState.hidden = true;
 
-        resultCount.textContent = "Unable to load internships.";
+        resultCount.textContent =
+            "Unable to load internships.";
 
     }
 }
 
 
-// 6. Generate an Internship Card
+// 6. Generate Internship Card
 
 function createInternshipCard(internship) {
 
-    const skills = internship.skills
-        .map(skill => `
-            <span class="skill-tag">
-                ${escapeHTML(skill)}
-            </span>
-        `).join("");
+    const skills = internship.skills.map(skill => `
+        <span class="skill-tag">
+            ${escapeHTML(skill)}
+        </span>
+    `).join("");
 
     const initials = escapeHTML(
         internship.title.substring(0, 1).toUpperCase()
@@ -242,14 +236,12 @@ function renderInternships() {
 
     const filteredInternships = filterInternships();
 
-    const apiResponse = createResponse(filteredInternships);
-
     internshipList.innerHTML = "";
 
     loadingState.hidden = true;
     errorState.hidden = true;
 
-    if (apiResponse.data.length === 0) {
+    if (filteredInternships.length === 0) {
 
         emptyState.hidden = false;
 
@@ -260,12 +252,12 @@ function renderInternships() {
 
     emptyState.hidden = true;
 
-    internshipList.innerHTML = apiResponse.data
+    internshipList.innerHTML = filteredInternships
         .map(createInternshipCard)
         .join("");
 
     resultCount.textContent =
-        `${apiResponse.pagination.total} opportunities found`;
+        `${filteredInternships.length} opportunities found`;
 }
 
 
@@ -274,17 +266,17 @@ function renderInternships() {
 searchInput.addEventListener("input", renderInternships);
 
 
-// 10. Domain Filter Event
+// 10. Domain Filter
 
 domainFilter.addEventListener("change", renderInternships);
 
 
-// 11. Work Mode Filter Event
+// 11. Work Mode Filter
 
 modeFilter.addEventListener("change", renderInternships);
 
 
-// 12. Reset All Filters
+// 12. Reset Filters
 
 resetButton.addEventListener("click", () => {
 
@@ -363,13 +355,12 @@ applyButton.addEventListener("click", () => {
 
     if (!selectedInternship) return;
 
-    applicationInternshipId.value = selectedInternship.id;
-
     applicationForm.reset();
 
     applicationInternshipId.value = selectedInternship.id;
 
     applicationMessage.textContent = "";
+    applicationMessage.style.color = "";
 
     detailsDialog.close();
 
@@ -390,9 +381,9 @@ document.getElementById("closeApplication")
     });
 
 
-// 17. Validate and Submit Application
+// 17. Validate and Submit Application to Backend
 
-applicationForm.addEventListener("submit", event => {
+applicationForm.addEventListener("submit", async event => {
 
     event.preventDefault();
 
@@ -409,17 +400,17 @@ applicationForm.addEventListener("submit", event => {
 
     const internshipId = applicationInternshipId.value;
 
-    // Check required name
+    // Client-side name validation
 
-    if (!name || name.length > 100) {
+    if (!name || name.length < 2 || name.length > 100) {
 
         applicationMessage.textContent =
-            "Please enter a valid name.";
+            "Please enter a name between 2 and 100 characters.";
 
         return;
     }
 
-    // Check email
+    // Client-side email validation
 
     const emailPattern =
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -432,7 +423,7 @@ applicationForm.addEventListener("submit", event => {
         return;
     }
 
-    // Check internship ID
+    // Verify internship
 
     const validInternship = internships.some(item =>
         item.id === internshipId
@@ -446,7 +437,7 @@ applicationForm.addEventListener("submit", event => {
         return;
     }
 
-    // Check portfolio URL safety
+    // Validate portfolio URL
 
     if (portfolio) {
 
@@ -454,92 +445,89 @@ applicationForm.addEventListener("submit", event => {
 
             const url = new URL(portfolio);
 
-            if (!["http:", "https:"].includes(url.protocol)) {
-                throw new Error("Unsafe URL");
+            if (
+                url.protocol !== "https:" ||
+                !url.hostname.includes(".")
+            ) {
+                throw new Error("Invalid URL");
             }
 
         } catch {
 
             applicationMessage.textContent =
-                "Please enter a valid HTTP or HTTPS portfolio URL.";
+                "Please enter a valid HTTPS portfolio URL.";
 
             return;
         }
     }
 
-    // Check previously submitted applications
+    // Disable button while submitting
 
-    let previousApplications = [];
+    const originalButtonText = applyButton.textContent;
+
+    applyButton.disabled = true;
+    applyButton.textContent = "Submitting...";
 
     try {
 
-        previousApplications = JSON.parse(
-            localStorage.getItem(APPLICATION_STORAGE_KEY) || "[]"
+        const response = await fetch(
+            `${API_BASE_URL}/applications`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    internshipId,
+                    name,
+                    email,
+                    portfolio
+                })
+            }
         );
 
-        if (!Array.isArray(previousApplications)) {
-            throw new Error("Invalid application storage.");
+        const result = await response.json();
+
+        if (!response.ok || result.status !== "success") {
+            throw new Error(
+                result.message || "Application submission failed."
+            );
         }
 
-    } catch {
+        applicationMessage.style.color = "green";
 
         applicationMessage.textContent =
-            "Application storage is unavailable. Please try again.";
+            "Application submitted successfully!";
 
-        return;
+        applicationForm.reset();
+
+        applicationInternshipId.value = internshipId;
+
+    } catch (error) {
+
+        console.error("Application Error:", error);
+
+        applicationMessage.style.color = "red";
+
+        applicationMessage.textContent = error.message;
+
+    } finally {
+
+        applyButton.disabled = false;
+        applyButton.textContent = originalButtonText;
+
     }
-
-    const duplicate = previousApplications.some(application =>
-        application.internshipId === internshipId &&
-        application.email === email
-    );
-
-    if (duplicate) {
-
-        applicationMessage.textContent =
-            "You have already applied for this internship.";
-
-        return;
-    }
-
-    // Save only a duplicate-prevention key.
-    // This demo does not store full applicant records.
-
-    previousApplications.push({
-        internshipId: internshipId,
-        email: email
-    });
-
-    try {
-
-        localStorage.setItem(
-            APPLICATION_STORAGE_KEY,
-            JSON.stringify(previousApplications)
-        );
-
-    } catch {
-
-        applicationMessage.textContent =
-            "Unable to save your application in this browser.";
-
-        return;
-    }
-
-    applicationMessage.textContent =
-        "Application submitted successfully! (Demo only)";
-
-    applicationForm.reset();
-
-    applicationInternshipId.value = internshipId;
 
 });
 
 
-// 18. Retry Loading Data
+// 18. Retry Loading Internships
 
 retryButton.addEventListener("click", loadInternships);
 
 
-// 19. Start the Application
+// 19. Start Application
 
 loadInternships();
