@@ -1,17 +1,19 @@
 
-/* ==========================================
-   INTERNHUB - INTERNSHIP BOARD
-   API Integrated JavaScript
-   ========================================== */
+"use strict";
 
-// 1. API Configuration
+// --------------------------------------------------
+// API CONFIGURATION
+// --------------------------------------------------
 
 const API_BASE_URL = "http://localhost:5000/api";
+const PAGE_LIMIT = 5;
 
-
-// 2. DOM Elements
+// --------------------------------------------------
+// DOM ELEMENTS
+// --------------------------------------------------
 
 const internshipList = document.getElementById("internshipList");
+
 const searchInput = document.getElementById("searchInput");
 const domainFilter = document.getElementById("domainFilter");
 const modeFilter = document.getElementById("modeFilter");
@@ -27,58 +29,180 @@ const retryButton = document.getElementById("retryButton");
 const detailsDialog = document.getElementById("detailsDialog");
 const detailsTitle = document.getElementById("detailsTitle");
 const detailsContent = document.getElementById("detailsContent");
+const closeDetails = document.getElementById("closeDetails");
+const applyButton = document.getElementById("applyButton");
 
 const applicationDialog = document.getElementById("applicationDialog");
 const applicationForm = document.getElementById("applicationForm");
 const applicationMessage = document.getElementById("applicationMessage");
+const applicationInternshipId = document.getElementById(
+    "applicationInternshipId"
+);
 
-const applicationInternshipId =
-    document.getElementById("applicationInternshipId");
+const closeApplication = document.getElementById("closeApplication");
+const applicantName = document.getElementById("applicantName");
+const applicantEmail = document.getElementById("applicantEmail");
+const portfolioUrl = document.getElementById("portfolioUrl");
 
-const applyButton = document.getElementById("applyButton");
+// --------------------------------------------------
+// APPLICATION STATE
+// --------------------------------------------------
 
-
-// 3. Application Data
-
-let internships = [];
+let currentPage = 1;
+let totalPages = 1;
 let selectedInternship = null;
+let searchTimer = null;
+let requestController = null;
+let requestNumber = 0;
 
+// --------------------------------------------------
+// CREATE PAGINATION CONTAINER
+// --------------------------------------------------
 
-// 4. Escape HTML
+const paginationContainer = document.createElement("nav");
 
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, character => {
-        const entities = {
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        };
+paginationContainer.id = "paginationContainer";
+paginationContainer.className = "pagination-container";
+paginationContainer.setAttribute("aria-label", "Internship pages");
 
-        return entities[character];
-    });
-}
+internshipList.insertAdjacentElement("afterend", paginationContainer);
 
+// --------------------------------------------------
+// HELPER FUNCTIONS
+// --------------------------------------------------
 
-// 5. Load Internships from Backend API
-
-async function loadInternships() {
-
-    loadingState.hidden = false;
+function hideAllStates() {
+    loadingState.hidden = true;
     errorState.hidden = true;
     emptyState.hidden = true;
+}
 
-    internshipList.innerHTML = "";
+function showLoading() {
+    hideAllStates();
+
+    loadingState.hidden = false;
+    internshipList.replaceChildren();
+    paginationContainer.replaceChildren();
+
     resultCount.textContent = "Loading internships...";
+}
+
+function showError(message) {
+    hideAllStates();
+
+    errorState.hidden = false;
+    internshipList.replaceChildren();
+    paginationContainer.replaceChildren();
+
+    const errorParagraph = errorState.querySelector("p");
+
+    if (errorParagraph) {
+        errorParagraph.textContent = message;
+    }
+
+    resultCount.textContent = "Unable to load opportunities.";
+}
+
+function showEmpty() {
+    hideAllStates();
+
+    emptyState.hidden = false;
+    internshipList.replaceChildren();
+    paginationContainer.replaceChildren();
+
+    resultCount.textContent = "0 opportunities found.";
+}
+
+function createElement(tag, className, text) {
+    const element = document.createElement(tag);
+
+    if (className) {
+        element.className = className;
+    }
+
+    if (text !== undefined) {
+        element.textContent = text;
+    }
+
+    return element;
+}
+
+function createButton(text, className, onClick) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+
+    return button;
+}
+
+function formatSkills(skills) {
+    if (!Array.isArray(skills)) {
+        return [];
+    }
+
+    return skills.filter(
+        (skill) => typeof skill === "string"
+    );
+}
+
+// --------------------------------------------------
+// FETCH INTERNSHIPS
+// --------------------------------------------------
+
+async function fetchInternships() {
+    // Cancel an older request if the user changes filters quickly.
+    if (requestController) {
+        requestController.abort();
+    }
+
+    requestController = new AbortController();
+
+    const thisRequest = ++requestNumber;
+
+    showLoading();
+
+    const params = new URLSearchParams();
+
+    params.set("page", currentPage);
+    params.set("limit", PAGE_LIMIT);
+
+    const search = searchInput.value.trim();
+    const domain = domainFilter.value;
+    const mode = modeFilter.value;
+
+    if (search) {
+        params.set("search", search);
+    }
+
+    if (domain) {
+        params.set("domain", domain);
+    }
+
+    if (mode) {
+        params.set("mode", mode);
+    }
 
     try {
-
         const response = await fetch(
-            `${API_BASE_URL}/internships`
+            `${API_BASE_URL}/internships?${params.toString()}`,
+            {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                },
+                signal: requestController.signal
+            }
         );
 
         const result = await response.json();
+
+        // Ignore responses from older requests.
+        if (thisRequest !== requestNumber) {
+            return;
+        }
 
         if (!response.ok || result.status !== "success") {
             throw new Error(
@@ -87,404 +211,385 @@ async function loadInternships() {
         }
 
         if (!Array.isArray(result.data)) {
-            throw new Error("Invalid internship data received.");
+            throw new Error("Invalid response received from the server.");
         }
 
-        internships = result.data;
+        const pagination = result.pagination || {};
 
-        // Ensure skills are always an array
-        internships = internships.map(internship => ({
-            ...internship,
-            skills: Array.isArray(internship.skills)
-                ? internship.skills
-                : []
-        }));
+        totalPages = Math.max(
+            1,
+            Number(pagination.totalPages) || 1
+        );
 
-        loadingState.hidden = true;
+        currentPage = Math.max(
+            1,
+            Number(pagination.page) || currentPage
+        );
 
-        renderInternships();
+        renderInternships(result.data);
 
-    } catch (error) {
+        const total = Number(pagination.total) || 0;
 
-        console.error("API Loading Error:", error);
+        if (total === 0) {
+            showEmpty();
+            return;
+        }
 
-        loadingState.hidden = true;
-        errorState.hidden = false;
-        emptyState.hidden = true;
+        hideAllStates();
+
+        const start = (currentPage - 1) * PAGE_LIMIT + 1;
+        const end = Math.min(currentPage * PAGE_LIMIT, total);
 
         resultCount.textContent =
-            "Unable to load internships.";
+            `Showing ${start}-${end} of ${total} opportunities`;
 
+        renderPagination();
+
+    } catch (error) {
+        if (error.name === "AbortError") {
+            return;
+        }
+
+        console.error("Internship fetch error:", error);
+
+        showError(
+            error.message ||
+            "Unable to connect to the server. Please try again."
+        );
     }
 }
 
+// --------------------------------------------------
+// RENDER INTERNSHIP CARDS
+// --------------------------------------------------
 
-// 6. Generate Internship Card
+function renderInternships(internships) {
+    internshipList.replaceChildren();
 
-function createInternshipCard(internship) {
+    internships.forEach((internship) => {
+        const card = createElement("article", "internship-card");
 
-    const skills = internship.skills.map(skill => `
-        <span class="skill-tag">
-            ${escapeHTML(skill)}
-        </span>
-    `).join("");
+        // Card heading
+        const cardHeader = createElement("div", "card-header");
 
-    const initials = escapeHTML(
-        internship.title.substring(0, 1).toUpperCase()
-    );
+        const title = createElement(
+            "h3",
+            "internship-title",
+            internship.title || "Untitled Internship"
+        );
 
-    return `
-        <article class="internship-card">
+        const domain = createElement(
+            "span",
+            "internship-domain",
+            internship.domain || "General"
+        );
 
-            <div class="card-top">
+        cardHeader.append(title, domain);
 
-                <div class="company-icon" aria-hidden="true">
-                    ${initials}
-                </div>
+        // Internship information
+        const information = createElement(
+            "div",
+            "internship-information"
+        );
 
-                <span class="mode-badge">
-                    ${escapeHTML(internship.mode)}
-                </span>
+        const location = createElement(
+            "p",
+            "internship-location",
+            `Location: ${internship.location || "Not specified"}`
+        );
 
-            </div>
+        const mode = createElement(
+            "p",
+            "internship-mode",
+            `Work Mode: ${internship.mode || "Not specified"}`
+        );
 
-            <h3>${escapeHTML(internship.title)}</h3>
+        const openings = createElement(
+            "p",
+            "internship-openings",
+            `Openings: ${internship.openings ?? "Not specified"}`
+        );
 
-            <p class="card-domain">
-                ${escapeHTML(internship.domain)}
-            </p>
+        information.append(location, mode, openings);
 
-            <div class="card-info">
+        // Skills
+        const skillsContainer = createElement(
+            "div",
+            "internship-skills"
+        );
 
-                <span>
-                    📍 ${escapeHTML(internship.location)}
-                </span>
+        formatSkills(internship.skills).forEach((skill) => {
+            const skillTag = createElement(
+                "span",
+                "skill-tag",
+                skill
+            );
 
-                <span>
-                    ID: ${escapeHTML(internship.id)}
-                </span>
+            skillsContainer.appendChild(skillTag);
+        });
 
-            </div>
+        // Buttons
+        const actions = createElement("div", "card-actions");
 
-            <div class="skills-list">
-                ${skills}
-            </div>
+        const detailsButton = createButton(
+            "View Details",
+            "details-button",
+            () => openDetails(internship)
+        );
 
-            <div class="card-bottom">
+        const cardApplyButton = createButton(
+            "Apply Now",
+            "apply-card-button",
+            () => openApplication(internship)
+        );
 
-                <span class="openings-text">
-                    ${Number(internship.openings)} openings
-                </span>
+        actions.append(detailsButton, cardApplyButton);
 
-                <button
-                    type="button"
-                    class="details-button"
-                    data-id="${escapeHTML(internship.id)}"
-                    aria-label="View details for ${escapeHTML(internship.title)}"
-                >
-                    View Details →
-                </button>
+        card.append(
+            cardHeader,
+            information,
+            skillsContainer,
+            actions
+        );
 
-            </div>
-
-        </article>
-    `;
-}
-
-
-// 7. Search and Filter Internships
-
-function filterInternships() {
-
-    const searchTerm = searchInput.value
-        .trim()
-        .toLowerCase();
-
-    const selectedDomain = domainFilter.value;
-    const selectedMode = modeFilter.value;
-
-    return internships.filter(internship => {
-
-        const searchableContent = [
-            internship.title,
-            internship.domain,
-            internship.location,
-            internship.mode,
-            ...internship.skills
-        ].join(" ").toLowerCase();
-
-        const matchesSearch =
-            searchableContent.includes(searchTerm);
-
-        const matchesDomain =
-            !selectedDomain ||
-            internship.domain === selectedDomain;
-
-        const matchesMode =
-            !selectedMode ||
-            internship.mode === selectedMode;
-
-        return matchesSearch && matchesDomain && matchesMode;
-
+        internshipList.appendChild(card);
     });
 }
 
+// --------------------------------------------------
+// PAGINATION
+// --------------------------------------------------
 
-// 8. Display Internship Cards
+function renderPagination() {
+    paginationContainer.replaceChildren();
 
-function renderInternships() {
-
-    const filteredInternships = filterInternships();
-
-    internshipList.innerHTML = "";
-
-    loadingState.hidden = true;
-    errorState.hidden = true;
-
-    if (filteredInternships.length === 0) {
-
-        emptyState.hidden = false;
-
-        resultCount.textContent = "0 opportunities found";
-
+    if (totalPages <= 1) {
         return;
     }
 
-    emptyState.hidden = true;
-
-    internshipList.innerHTML = filteredInternships
-        .map(createInternshipCard)
-        .join("");
-
-    resultCount.textContent =
-        `${filteredInternships.length} opportunities found`;
-}
-
-
-// 9. Search Event
-
-searchInput.addEventListener("input", renderInternships);
-
-
-// 10. Domain Filter
-
-domainFilter.addEventListener("change", renderInternships);
-
-
-// 11. Work Mode Filter
-
-modeFilter.addEventListener("change", renderInternships);
-
-
-// 12. Reset Filters
-
-resetButton.addEventListener("click", () => {
-
-    searchInput.value = "";
-    domainFilter.value = "";
-    modeFilter.value = "";
-
-    renderInternships();
-
-});
-
-
-// 13. Open Internship Details
-
-internshipList.addEventListener("click", event => {
-
-    const button = event.target.closest(".details-button");
-
-    if (!button) return;
-
-    const internship = internships.find(item =>
-        item.id === button.dataset.id
+    const previousButton = createButton(
+        "← Previous",
+        "pagination-button",
+        () => changePage(currentPage - 1)
     );
 
-    if (!internship) return;
+    previousButton.disabled = currentPage <= 1;
+
+    paginationContainer.appendChild(previousButton);
+
+    const pageInformation = createElement(
+        "span",
+        "pagination-info",
+        `Page ${currentPage} of ${totalPages}`
+    );
+
+    paginationContainer.appendChild(pageInformation);
+
+    const nextButton = createButton(
+        "Next →",
+        "pagination-button",
+        () => changePage(currentPage + 1)
+    );
+
+    nextButton.disabled = currentPage >= totalPages;
+
+    paginationContainer.appendChild(nextButton);
+}
+
+function changePage(page) {
+    if (page < 1 || page > totalPages || page === currentPage) {
+        return;
+    }
+
+    currentPage = page;
+
+    fetchInternships();
+
+    document.getElementById("internships").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+// --------------------------------------------------
+// INTERNSHIP DETAILS DIALOG
+// --------------------------------------------------
+
+function openDetails(internship) {
+    selectedInternship = internship;
+
+    detailsTitle.textContent =
+        internship.title || "Internship Details";
+
+    detailsContent.replaceChildren();
+
+    const domain = createElement(
+        "p",
+        "details-domain",
+        `Domain: ${internship.domain || "Not specified"}`
+    );
+
+    const location = createElement(
+        "p",
+        "",
+        `Location: ${internship.location || "Not specified"}`
+    );
+
+    const mode = createElement(
+        "p",
+        "",
+        `Work Mode: ${internship.mode || "Not specified"}`
+    );
+
+    const openings = createElement(
+        "p",
+        "",
+        `Openings: ${internship.openings ?? "Not specified"}`
+    );
+
+    const skillsHeading = createElement("h3", "", "Required Skills");
+
+    const skillsList = createElement("ul", "details-skills");
+
+    formatSkills(internship.skills).forEach((skill) => {
+        skillsList.appendChild(
+            createElement("li", "", skill)
+        );
+    });
+
+    detailsContent.append(
+        domain,
+        location,
+        mode,
+        openings,
+        skillsHeading,
+        skillsList
+    );
+
+    detailsDialog.showModal();
+}
+
+// --------------------------------------------------
+// APPLICATION DIALOG
+// --------------------------------------------------
+
+function openApplication(internship) {
+    if (!internship || !internship.id) {
+        return;
+    }
 
     selectedInternship = internship;
 
-    detailsTitle.textContent = internship.title;
-
-    detailsContent.innerHTML = `
-        <p><strong>Internship ID:</strong>
-            ${escapeHTML(internship.id)}</p>
-
-        <p><strong>Domain:</strong>
-            ${escapeHTML(internship.domain)}</p>
-
-        <p><strong>Work Mode:</strong>
-            ${escapeHTML(internship.mode)}</p>
-
-        <p><strong>Location:</strong>
-            ${escapeHTML(internship.location)}</p>
-
-        <p><strong>Available Openings:</strong>
-            ${Number(internship.openings)}</p>
-
-        <p><strong>Required Skills:</strong></p>
-
-        <div class="skills-list">
-            ${internship.skills.map(skill => `
-                <span class="skill-tag">
-                    ${escapeHTML(skill)}
-                </span>
-            `).join("")}
-        </div>
-    `;
-
-    detailsDialog.showModal();
-
-});
-
-
-// 14. Close Details Dialog
-
-document.getElementById("closeDetails")
-    .addEventListener("click", () => {
-
-        detailsDialog.close();
-
-    });
-
-
-// 15. Open Application Form
-
-applyButton.addEventListener("click", () => {
-
-    if (!selectedInternship) return;
-
     applicationForm.reset();
 
-    applicationInternshipId.value = selectedInternship.id;
+    applicationInternshipId.value = internship.id;
 
     applicationMessage.textContent = "";
-    applicationMessage.style.color = "";
+    applicationMessage.className = "";
 
-    detailsDialog.close();
+    if (detailsDialog.open) {
+        detailsDialog.close();
+    }
 
     applicationDialog.showModal();
+}
 
-    document.getElementById("applicantName").focus();
+// --------------------------------------------------
+// APPLICATION FORM VALIDATION
+// --------------------------------------------------
 
-});
-
-
-// 16. Close Application Dialog
-
-document.getElementById("closeApplication")
-    .addEventListener("click", () => {
-
-        applicationDialog.close();
-
-    });
-
-
-// 17. Validate and Submit Application to Backend
-
-applicationForm.addEventListener("submit", async event => {
-
-    event.preventDefault();
-
-    applicationMessage.textContent = "";
-
-    const name = document.getElementById("applicantName")
-        .value.trim();
-
-    const email = document.getElementById("applicantEmail")
-        .value.trim().toLowerCase();
-
-    const portfolio = document.getElementById("portfolioUrl")
-        .value.trim();
-
-    const internshipId = applicationInternshipId.value;
-
-    // Client-side name validation
-
-    if (!name || name.length < 2 || name.length > 100) {
-
-        applicationMessage.textContent =
-            "Please enter a name between 2 and 100 characters.";
-
-        return;
+function validatePortfolio(value) {
+    if (!value) {
+        return true;
     }
-
-    // Client-side email validation
-
-    const emailPattern =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailPattern.test(email)) {
-
-        applicationMessage.textContent =
-            "Please enter a valid email address.";
-
-        return;
-    }
-
-    // Verify internship
-
-    const validInternship = internships.some(item =>
-        item.id === internshipId
-    );
-
-    if (!validInternship) {
-
-        applicationMessage.textContent =
-            "Please select a valid internship.";
-
-        return;
-    }
-
-    // Validate portfolio URL
-
-    if (portfolio) {
-
-        try {
-
-            const url = new URL(portfolio);
-
-            if (
-                url.protocol !== "https:" ||
-                !url.hostname.includes(".")
-            ) {
-                throw new Error("Invalid URL");
-            }
-
-        } catch {
-
-            applicationMessage.textContent =
-                "Please enter a valid HTTPS portfolio URL.";
-
-            return;
-        }
-    }
-
-    // Disable button while submitting
-
-    const originalButtonText = applyButton.textContent;
-
-    applyButton.disabled = true;
-    applyButton.textContent = "Submitting...";
 
     try {
+        const url = new URL(value);
 
+        return (
+            url.protocol === "https:" &&
+            url.hostname.includes(".")
+        );
+    } catch {
+        return false;
+    }
+}
+
+// --------------------------------------------------
+// SUBMIT APPLICATION
+// --------------------------------------------------
+
+applicationForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const internshipId = applicationInternshipId.value.trim();
+    const name = applicantName.value.trim();
+    const email = applicantEmail.value.trim();
+    const portfolio = portfolioUrl.value.trim();
+
+    applicationMessage.textContent = "";
+    applicationMessage.className = "";
+
+    if (!internshipId) {
+        applicationMessage.textContent =
+            "Please select an internship before applying.";
+        return;
+    }
+
+    if (name.length < 2 || name.length > 80) {
+        applicationMessage.textContent =
+            "Please enter a valid name between 2 and 80 characters.";
+        applicantName.focus();
+        return;
+    }
+
+    if (!/^[\p{L}\p{M} .'-]+$/u.test(name)) {
+        applicationMessage.textContent =
+            "Your name contains invalid characters.";
+        applicantName.focus();
+        return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+        applicationMessage.textContent =
+            "Please enter a valid email address.";
+        applicantEmail.focus();
+        return;
+    }
+
+    if (portfolio && !validatePortfolio(portfolio)) {
+        applicationMessage.textContent =
+            "Please enter a valid HTTPS portfolio URL.";
+        portfolioUrl.focus();
+        return;
+    }
+
+    const submitButton = applicationForm.querySelector(
+        'button[type="submit"]'
+    );
+
+    const originalButtonText = submitButton.textContent;
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Submitting...";
+
+    const applicationData = {
+        internshipId,
+        name,
+        email,
+        portfolio
+    };
+
+    try {
         const response = await fetch(
             `${API_BASE_URL}/applications`,
             {
                 method: "POST",
-
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 },
-
-                body: JSON.stringify({
-                    internshipId,
-                    name,
-                    email,
-                    portfolio
-                })
+                body: JSON.stringify(applicationData)
             }
         );
 
@@ -492,42 +597,124 @@ applicationForm.addEventListener("submit", async event => {
 
         if (!response.ok || result.status !== "success") {
             throw new Error(
-                result.message || "Application submission failed."
+                result.message || "Unable to submit your application."
             );
         }
 
-        applicationMessage.style.color = "green";
-
         applicationMessage.textContent =
-            "Application submitted successfully!";
+            "Your application has been submitted successfully!";
+
+        applicationMessage.className = "success-message";
 
         applicationForm.reset();
 
         applicationInternshipId.value = internshipId;
 
+        // Close the dialog after the success message is visible.
+        setTimeout(() => {
+            if (applicationDialog.open) {
+                applicationDialog.close();
+            }
+        }, 1800);
+
     } catch (error) {
+        console.error("Application submission error:", error);
 
-        console.error("Application Error:", error);
+        applicationMessage.textContent =
+            error.message ||
+            "Something went wrong. Please try again.";
 
-        applicationMessage.style.color = "red";
-
-        applicationMessage.textContent = error.message;
+        applicationMessage.className = "error-message";
 
     } finally {
-
-        applyButton.disabled = false;
-        applyButton.textContent = originalButtonText;
-
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
     }
-
 });
 
+// --------------------------------------------------
+// SEARCH AND FILTER EVENTS
+// --------------------------------------------------
 
-// 18. Retry Loading Internships
+searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
 
-retryButton.addEventListener("click", loadInternships);
+    searchTimer = setTimeout(() => {
+        currentPage = 1;
+        fetchInternships();
+    }, 350);
+});
 
+domainFilter.addEventListener("change", () => {
+    currentPage = 1;
+    fetchInternships();
+});
 
-// 19. Start Application
+modeFilter.addEventListener("change", () => {
+    currentPage = 1;
+    fetchInternships();
+});
 
-loadInternships();
+// --------------------------------------------------
+// RESET FILTERS
+// --------------------------------------------------
+
+resetButton.addEventListener("click", () => {
+    searchInput.value = "";
+    domainFilter.value = "";
+    modeFilter.value = "";
+
+    clearTimeout(searchTimer);
+
+    currentPage = 1;
+
+    fetchInternships();
+});
+
+// --------------------------------------------------
+// RETRY BUTTON
+// --------------------------------------------------
+
+retryButton.addEventListener("click", () => {
+    fetchInternships();
+});
+
+// --------------------------------------------------
+// DIALOG CLOSE BUTTONS
+// --------------------------------------------------
+
+closeDetails.addEventListener("click", () => {
+    detailsDialog.close();
+});
+
+closeApplication.addEventListener("click", () => {
+    applicationDialog.close();
+});
+
+// Close dialogs when clicking their backdrop.
+detailsDialog.addEventListener("click", (event) => {
+    if (event.target === detailsDialog) {
+        detailsDialog.close();
+    }
+});
+
+applicationDialog.addEventListener("click", (event) => {
+    if (event.target === applicationDialog) {
+        applicationDialog.close();
+    }
+});
+
+// Apply button inside the details dialog.
+applyButton.addEventListener("click", () => {
+    if (selectedInternship) {
+        openApplication(selectedInternship);
+    }
+});
+
+// --------------------------------------------------
+// INITIALIZE APPLICATION
+// --------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+    fetchInternships();
+});

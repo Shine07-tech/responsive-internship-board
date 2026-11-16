@@ -1,15 +1,32 @@
 
 const Database = require("better-sqlite3");
 const path = require("path");
+const fs = require("fs");
 
-const db = new Database(
-  path.join(__dirname, "internships.db")
-);
+// Use the cloud database location when provided.
+// Otherwise, use the existing local database file.
+const databasePath = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(__dirname, "internships.db");
 
-// Enable foreign key support
+// Ensure the database directory exists.
+const databaseDirectory = path.dirname(databasePath);
+
+if (!fs.existsSync(databaseDirectory)) {
+  fs.mkdirSync(databaseDirectory, { recursive: true });
+}
+
+// Connect to SQLite.
+const db = new Database(databasePath);
+
+// Enable foreign key support.
 db.pragma("foreign_keys = ON");
 
-// Create internships table
+// Improve reliability for concurrent database access.
+db.pragma("journal_mode = WAL");
+db.pragma("busy_timeout = 5000");
+
+// Create internships table.
 db.exec(`
   CREATE TABLE IF NOT EXISTS internships (
     id TEXT PRIMARY KEY,
@@ -22,7 +39,7 @@ db.exec(`
   )
 `);
 
-// Create applications table
+// Create applications table.
 db.exec(`
   CREATE TABLE IF NOT EXISTS applications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,5 +58,6 @@ db.exec(`
 `);
 
 console.log("Database connected successfully!");
+console.log(`Database location: ${databasePath}`);
 
 module.exports = db;

@@ -1,9 +1,10 @@
 
 /* =========================================
    INTERNHUB - RESPONSIVE INTERNSHIP BOARD
+   Complete Production Frontend Stylesheet
    ========================================= */
 
-/* 1. Global Settings */
+/* 1. GLOBAL SETTINGS */
 
 * {
     margin: 0;
@@ -52,7 +53,12 @@ select:focus-visible {
     display: none !important;
 }
 
-/* 2. Navigation Bar */
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 2. NAVIGATION BAR */
 
 .navbar {
     background: #ffffff;
@@ -114,7 +120,7 @@ select:focus-visible {
     background: #1d4ed8;
 }
 
-/* 3. Hero Section */
+/* 3. HERO SECTION */
 
 .hero {
     background: linear-gradient(120deg, #eff6ff, #f8faff);
@@ -225,7 +231,7 @@ select:focus-visible {
     bottom: -30px;
 }
 
-/* 4. Internship Section */
+/* 4. INTERNSHIP SECTION */
 
 .internship-section {
     max-width: 1200px;
@@ -250,7 +256,7 @@ select:focus-visible {
     font-size: 15px;
 }
 
-/* 5. Search and Filters */
+/* 5. SEARCH AND FILTERS */
 
 .filter-container {
     background: #f8fafc;
@@ -317,7 +323,7 @@ select:focus-visible {
     background: #eff6ff;
 }
 
-/* 6. Results Heading */
+/* 6. RESULTS HEADING */
 
 .results-header {
     display: flex;
@@ -337,13 +343,15 @@ select:focus-visible {
     font-size: 13px;
 }
 
-/* 7. Internship Cards */
+/* 7. INTERNSHIP GRID */
 
 .internship-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 22px;
 }
+
+/* 8. INTERNSHIP CARDS */
 
 .internship-card {
     border: 1px solid #e5eaf3;
@@ -358,59 +366,44 @@ select:focus-visible {
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
 }
 
-.card-top {
+.card-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    margin-bottom: 18px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
 }
 
-.company-icon {
-    width: 48px;
-    height: 48px;
+.internship-title {
+    flex: 1;
+    min-width: 150px;
+    font-size: 20px;
+    color: #172554;
+}
+
+.internship-domain {
     background: #eff6ff;
     color: #2563eb;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    font-weight: 800;
-}
-
-.mode-badge {
-    background: #ecfdf5;
-    color: #047857;
-    border-radius: 30px;
-    padding: 6px 12px;
+    padding: 5px 10px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 700;
 }
 
-.internship-card h3 {
-    font-size: 20px;
-    color: #172554;
-    margin-bottom: 7px;
-}
-
-.card-domain {
-    color: #2563eb;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-.card-info {
+.internship-information {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
-    color: #64748b;
-    font-size: 13px;
+    gap: 8px 18px;
     margin-bottom: 18px;
 }
 
-.skills-list {
+.internship-information p {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.internship-skills {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -426,18 +419,17 @@ select:focus-visible {
     font-weight: 600;
 }
 
-.card-bottom {
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     border-top: 1px solid #edf0f5;
     padding-top: 17px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
 }
 
-.openings-text {
-    color: #64748b;
-    font-size: 12px;
+.card-actions button {
+    flex: 1;
+    min-width: 110px;
 }
 
 .details-button {
@@ -455,7 +447,60 @@ select:focus-visible {
     background: #dbeafe;
 }
 
-/* 8. Loading, Empty and Error States */
+.apply-card-button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.apply-card-button:hover {
+    background: #1d4ed8;
+}
+
+/* 9. PAGINATION */
+
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 35px;
+}
+
+.pagination-button {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    padding: 10px 17px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-button:hover:not(:disabled) {
+    background: #2563eb;
+    color: white;
+}
+
+.pagination-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* 10. LOADING, EMPTY AND ERROR STATES */
 
 .status-message {
     text-align: center;
@@ -493,7 +538,7 @@ select:focus-visible {
     cursor: pointer;
 }
 
-/* 9. About Section */
+/* 11. ABOUT SECTION */
 
 .about-section {
     background: #f1f6ff;
@@ -513,7 +558,7 @@ select:focus-visible {
     color: #64748b;
 }
 
-/* 10. Dialogs */
+/* 12. DIALOGS */
 
 dialog {
     border: none;
@@ -553,11 +598,36 @@ dialog::backdrop {
     cursor: pointer;
 }
 
+.close-button:hover {
+    color: #172554;
+}
+
 .dialog-content .primary-button {
     margin-top: 20px;
 }
 
-/* 11. Application Form */
+/* 13. INTERNSHIP DETAILS */
+
+.details-domain {
+    color: #2563eb;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+#detailsContent p {
+    margin-bottom: 9px;
+}
+
+.details-skills {
+    padding-left: 22px;
+    color: #64748b;
+}
+
+.details-skills li {
+    margin-bottom: 5px;
+}
+
+/* 14. APPLICATION FORM */
 
 .form-group {
     margin-bottom: 18px;
@@ -584,7 +654,21 @@ dialog::backdrop {
     font-size: 13px;
 }
 
-/* 12. Footer */
+.success-message {
+    color: #047857;
+    background: #ecfdf5;
+    padding: 10px;
+    border-radius: 7px;
+}
+
+.error-message {
+    color: #b91c1c;
+    background: #fef2f2;
+    padding: 10px;
+    border-radius: 7px;
+}
+
+/* 15. FOOTER */
 
 .footer {
     background: #172554;
@@ -598,7 +682,7 @@ dialog::backdrop {
     margin-top: 5px;
 }
 
-/* 13. Tablet Responsive Layout */
+/* 16. TABLET RESPONSIVE LAYOUT */
 
 @media (max-width: 900px) {
 
@@ -621,7 +705,7 @@ dialog::backdrop {
     }
 }
 
-/* 14. Mobile Responsive Layout */
+/* 17. MOBILE RESPONSIVE LAYOUT */
 
 @media (max-width: 600px) {
 
@@ -699,6 +783,27 @@ dialog::backdrop {
         padding: 20px;
     }
 
+    .card-header {
+        flex-direction: column;
+    }
+
+    .card-actions {
+        flex-direction: column;
+    }
+
+    .card-actions button {
+        width: 100%;
+    }
+
+    .pagination-container {
+        gap: 8px;
+    }
+
+    .pagination-button {
+        padding: 9px 12px;
+        font-size: 12px;
+    }
+
     .about-section {
         padding: 55px 20px;
     }
@@ -712,7 +817,7 @@ dialog::backdrop {
     }
 }
 
-/* 15. Small Mobile Screens */
+/* 18. SMALL MOBILE SCREENS */
 
 @media (max-width: 360px) {
 
@@ -720,12 +825,29 @@ dialog::backdrop {
         font-size: 34px;
     }
 
-    .card-bottom {
-        align-items: flex-start;
+    .internship-information {
         flex-direction: column;
+        gap: 5px;
     }
 
-    .details-button {
-        width: 100%;
+    .pagination-container {
+        gap: 6px;
+    }
+
+    .pagination-button {
+        padding: 8px 10px;
+    }
+}
+
+/* 19. REDUCED MOTION ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
     }
 }
