@@ -6,7 +6,12 @@ const crypto = require("crypto");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const db = require("./database");
+
+const {
+  pool,
+  initializeDatabase,
+  closeDatabase,
+} = require("./database");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -57,10 +62,8 @@ app.use((req, res, next) => {
   const startTime = Date.now();
 
   res.on("finish", () => {
-    const duration = Date.now() - startTime;
-
     console.log(
-      `[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`
+      `[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - startTime}ms`
     );
   });
 
@@ -92,15 +95,6 @@ function requireAdminKey(req, res, next) {
   const adminKey = process.env.ADMIN_API_KEY;
   const providedKey = req.headers["x-admin-key"];
 
-  // Temporary diagnostic logging. Never log secret values.
-  console.log("ADMIN AUTH DIAGNOSTICS:", {
-    adminKeyLoaded: Boolean(adminKey),
-    adminKeyLength: adminKey ? adminKey.length : 0,
-    receivedHeader: Boolean(providedKey),
-    receivedKeyLength:
-      typeof providedKey === "string" ? providedKey.length : 0,
-  });
-
   if (!adminKey || typeof providedKey !== "string") {
     return res.status(401).json({
       status: "error",
@@ -124,7 +118,6 @@ function requireAdminKey(req, res, next) {
   next();
 }
 
-// Protect all internship-changing operations.
 app.use("/api/internships", (req, res, next) => {
   if (["POST", "PUT", "DELETE"].includes(req.method)) {
     return requireAdminKey(req, res, next);
@@ -278,9 +271,9 @@ function validateApplication(data) {
 // HEALTH CHECK
 // --------------------------------------------------
 
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
   try {
-    db.prepare("SELECT 1").get();
+    await pool.query("SELECT 1");
 
     return res.status(200).json({
       status: "success",
@@ -290,10 +283,7 @@ app.get("/health", (req, res) => {
   } catch (error) {
     console.error("Health check failed:", error.name);
 
-    return res.status(503).json({
-      status: "error",
-      message: "Database health check failed.",
-    });
+    return sendError(res, 503, "Database health check failed.");
   }
 });
 
@@ -312,12 +302,9 @@ app.get("/", (req, res) => {
 // GET ALL INTERNSHIPS
 // --------------------------------------------------
 
-app.get("/api/internships", (req, res) => {
+app.get("/api/internships", async (req, res) => {
   try {
-    const page = Math.max(
-      1,
-      parseInt(req.query.page, 10) || 1
-    );
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
     const limit = Math.min(
       50,
@@ -325,61 +312,59 @@ app.get("/api/internships", (req, res) => {
     );
 
     const offset = (page - 1) * limit;
-
     const { domain, mode, search } = req.query;
 
-    let query = "SELECT * FROM internships WHERE 1 = 1";
-    let countQuery =
-      "SELECT COUNT(*) AS total FROM internships WHERE 1 = 1";
-
-    const params = [];
-    const countParams = [];
+    let conditions = [];
+    let params = [];
 
     if (domain) {
-      query += " AND domain = ?";
-      countQuery += " AND domain = ?";
-
       params.push(domain);
-      countParams.push(domain);
+      conditions.push(`domain = $${params.length}`);
     }
 
     if (mode) {
-      query += " AND mode = ?";
-      countQuery += " AND mode = ?";
-
       params.push(mode);
-      countParams.push(mode);
+      conditions.push(`mode = $${params.length}`);
     }
 
     if (search) {
-      query +=
-        " AND (title LIKE ? OR domain LIKE ? OR location LIKE ?)";
-
-      countQuery +=
-        " AND (title LIKE ? OR domain LIKE ? OR location LIKE ?)";
-
       const searchTerm = `%${search}%`;
 
-      params.push(searchTerm, searchTerm, searchTerm);
-      countParams.push(searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm);
+      const searchPosition = params.length;
+
+      conditions.push(
+        `(title ILIKE $${searchPosition} OR domain ILIKE $${searchPosition} OR location ILIKE $${searchPosition})`
+      );
     }
 
-    const total = db
-      .prepare(countQuery)
-      .get(...countParams).total;
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
-    query += " ORDER BY id ASC LIMIT ? OFFSET ?";
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM internships ${whereClause}`,
+      params
+    );
 
-    params.push(limit, offset);
+    const total = countResult.rows[0].total;
 
-    const internships = db
-      .prepare(query)
-      .all(...params)
-      .map(formatInternship);
+    const dataParams = [...params, limit, offset];
+
+    const internshipResult = await pool.query(
+      `
+        SELECT * FROM internships
+        ${whereClause}
+        ORDER BY id ASC
+        LIMIT $${dataParams.length - 1}
+        OFFSET $${dataParams.length}
+      `,
+      dataParams
+    );
 
     return res.status(200).json({
       status: "success",
-      data: internships,
+      data: internshipResult.rows.map(formatInternship),
       pagination: {
         page,
         limit,
@@ -398,19 +383,20 @@ app.get("/api/internships", (req, res) => {
 // GET INTERNSHIP BY ID
 // --------------------------------------------------
 
-app.get("/api/internships/:id", (req, res) => {
+app.get("/api/internships/:id", async (req, res) => {
   try {
-    const internship = db
-      .prepare("SELECT * FROM internships WHERE id = ?")
-      .get(req.params.id);
+    const result = await pool.query(
+      "SELECT * FROM internships WHERE id = $1",
+      [req.params.id]
+    );
 
-    if (!internship) {
+    if (result.rows.length === 0) {
       return sendError(res, 404, "Internship not found.");
     }
 
     return res.status(200).json({
       status: "success",
-      data: formatInternship(internship),
+      data: formatInternship(result.rows[0]),
     });
   } catch (error) {
     console.error("Fetch internship failed:", error.name);
@@ -423,7 +409,7 @@ app.get("/api/internships/:id", (req, res) => {
 // CREATE INTERNSHIP (ADMIN ONLY)
 // --------------------------------------------------
 
-app.post("/api/internships", (req, res) => {
+app.post("/api/internships", async (req, res) => {
   try {
     const validationError = validateInternship(req.body);
 
@@ -441,27 +427,28 @@ app.post("/api/internships", (req, res) => {
       openings,
     } = req.body;
 
-    const existing = db
-      .prepare("SELECT id FROM internships WHERE id = ?")
-      .get(id);
+    const result = await pool.query(
+      `
+        INSERT INTO internships
+        (id, title, domain, mode, location, skills, openings)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      `,
+      [
+        id.trim(),
+        title.trim(),
+        domain.trim(),
+        mode,
+        location.trim(),
+        JSON.stringify(skills),
+        openings,
+      ]
+    );
 
-    if (existing) {
+    if (result.rows.length === 0) {
       return sendError(res, 409, "Internship already exists.");
     }
-
-    db.prepare(`
-      INSERT INTO internships
-      (id, title, domain, mode, location, skills, openings)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id.trim(),
-      title.trim(),
-      domain.trim(),
-      mode,
-      location.trim(),
-      JSON.stringify(skills),
-      openings
-    );
 
     return res.status(201).json({
       status: "success",
@@ -478,7 +465,7 @@ app.post("/api/internships", (req, res) => {
 // UPDATE INTERNSHIP (ADMIN ONLY)
 // --------------------------------------------------
 
-app.put("/api/internships/:id", (req, res) => {
+app.put("/api/internships/:id", async (req, res) => {
   try {
     const validationError = validateInternship(req.body);
 
@@ -486,20 +473,12 @@ app.put("/api/internships/:id", (req, res) => {
       return sendError(res, 400, validationError);
     }
 
-    if (req.body.id !== req.params.id) {
+    if (req.body.id.trim() !== req.params.id) {
       return sendError(
         res,
         400,
         "Internship ID cannot be changed."
       );
-    }
-
-    const existing = db
-      .prepare("SELECT id FROM internships WHERE id = ?")
-      .get(req.params.id);
-
-    if (!existing) {
-      return sendError(res, 404, "Internship not found.");
     }
 
     const {
@@ -511,24 +490,32 @@ app.put("/api/internships/:id", (req, res) => {
       openings,
     } = req.body;
 
-    db.prepare(`
-      UPDATE internships
-      SET title = ?,
-          domain = ?,
-          mode = ?,
-          location = ?,
-          skills = ?,
-          openings = ?
-      WHERE id = ?
-    `).run(
-      title.trim(),
-      domain.trim(),
-      mode,
-      location.trim(),
-      JSON.stringify(skills),
-      openings,
-      req.params.id
+    const result = await pool.query(
+      `
+        UPDATE internships
+        SET title = $1,
+            domain = $2,
+            mode = $3,
+            location = $4,
+            skills = $5::jsonb,
+            openings = $6
+        WHERE id = $7
+        RETURNING id
+      `,
+      [
+        title.trim(),
+        domain.trim(),
+        mode,
+        location.trim(),
+        JSON.stringify(skills),
+        openings,
+        req.params.id,
+      ]
     );
+
+    if (result.rows.length === 0) {
+      return sendError(res, 404, "Internship not found.");
+    }
 
     return res.status(200).json({
       status: "success",
@@ -545,18 +532,16 @@ app.put("/api/internships/:id", (req, res) => {
 // DELETE INTERNSHIP (ADMIN ONLY)
 // --------------------------------------------------
 
-app.delete("/api/internships/:id", (req, res) => {
+app.delete("/api/internships/:id", async (req, res) => {
   try {
-    const existing = db
-      .prepare("SELECT id FROM internships WHERE id = ?")
-      .get(req.params.id);
+    const result = await pool.query(
+      "DELETE FROM internships WHERE id = $1 RETURNING id",
+      [req.params.id]
+    );
 
-    if (!existing) {
+    if (result.rows.length === 0) {
       return sendError(res, 404, "Internship not found.");
     }
-
-    db.prepare("DELETE FROM internships WHERE id = ?")
-      .run(req.params.id);
 
     return res.status(200).json({
       status: "success",
@@ -573,7 +558,7 @@ app.delete("/api/internships/:id", (req, res) => {
 // SUBMIT APPLICATION
 // --------------------------------------------------
 
-app.post("/api/applications", (req, res) => {
+app.post("/api/applications", async (req, res) => {
   try {
     const validationError = validateApplication(req.body);
 
@@ -588,56 +573,48 @@ app.post("/api/applications", (req, res) => {
       portfolio,
     } = req.body;
 
-    const internship = db
-      .prepare("SELECT id FROM internships WHERE id = ?")
-      .get(internshipId);
+    const normalizedInternshipId = internshipId.trim();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!internship) {
+    const internship = await pool.query(
+      "SELECT id FROM internships WHERE id = $1",
+      [normalizedInternshipId]
+    );
+
+    if (internship.rows.length === 0) {
       return sendError(res, 404, "Internship not found.");
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const result = await pool.query(
+      `
+        INSERT INTO applications
+        (internship_id, name, email, portfolio)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (internship_id, email) DO NOTHING
+        RETURNING id
+      `,
+      [
+        normalizedInternshipId,
+        name.trim(),
+        normalizedEmail,
+        portfolio ? portfolio.trim() : "",
+      ]
+    );
 
-    const existingApplication = db
-      .prepare(`
-        SELECT id FROM applications
-        WHERE internship_id = ? AND email = ?
-      `)
-      .get(internshipId, normalizedEmail);
-
-    if (existingApplication) {
+    if (result.rows.length === 0) {
       return sendError(
         res,
         409,
         "You have already applied for this internship."
       );
     }
-
-    const result = db.prepare(`
-      INSERT INTO applications
-      (internship_id, name, email, portfolio)
-      VALUES (?, ?, ?, ?)
-    `).run(
-      internshipId,
-      name.trim(),
-      normalizedEmail,
-      portfolio ? portfolio.trim() : null
-    );
 
     return res.status(201).json({
       status: "success",
       message: "Application submitted successfully.",
-      applicationId: result.lastInsertRowid,
+      applicationId: result.rows[0].id,
     });
   } catch (error) {
-    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
-      return sendError(
-        res,
-        409,
-        "You have already applied for this internship."
-      );
-    }
-
     console.error("Application submission failed:", error.name);
 
     return sendError(res, 500, "Unable to submit application.");
@@ -679,42 +656,69 @@ app.use((error, req, res, next) => {
 });
 
 // --------------------------------------------------
-// START SERVER
+// START SERVER AFTER DATABASE INITIALIZATION
 // --------------------------------------------------
 
-const server = app.listen(PORT, () => {
-  console.log("Internship Board API started.");
-  console.log(
-    `Environment: ${process.env.NODE_ENV || "development"}`
-  );
-  console.log(`Server running at http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-});
+let server;
+
+async function startServer() {
+  try {
+    await initializeDatabase();
+
+    server = app.listen(PORT, () => {
+      console.log("Internship Board API started.");
+      console.log(
+        `Environment: ${process.env.NODE_ENV || "development"}`
+      );
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Health check: /health`);
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // --------------------------------------------------
 // GRACEFUL SHUTDOWN
 // --------------------------------------------------
 
-function shutdown(signal) {
-  console.log(`${signal} received. Shutting down server...`);
+let isShuttingDown = false;
 
-  server.close(() => {
-    try {
-      db.close();
-      console.log("Database connection closed.");
-      process.exit(0);
-    } catch (error) {
-      console.error("Shutdown error:", error.name);
-      process.exit(1);
-    }
-  });
+async function shutdown(signal) {
+  if (isShuttingDown) return;
 
-  setTimeout(() => {
-    console.error(
-      "Could not close connections in time. Forcing shutdown."
-    );
+  isShuttingDown = true;
+  console.log(`${signal} received. Shutting down...`);
+
+  const forceExit = setTimeout(() => {
+    console.error("Shutdown timed out.");
     process.exit(1);
-  }, 10000).unref();
+  }, 10000);
+
+  forceExit.unref();
+
+  try {
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+
+    await closeDatabase();
+
+    console.log("Database connection closed.");
+    clearTimeout(forceExit);
+    process.exit(0);
+  } catch (error) {
+    console.error("Shutdown error:", error.name);
+    process.exit(1);
+  }
 }
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));

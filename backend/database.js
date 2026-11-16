@@ -1,63 +1,73 @@
 
-const Database = require("better-sqlite3");
-const path = require("path");
-const fs = require("fs");
+const { Pool } = require("pg");
 
-// Use the cloud database location when provided.
-// Otherwise, use the existing local database file.
-const databasePath = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.join(__dirname, "internships.db");
-
-// Ensure the database directory exists.
-const databaseDirectory = path.dirname(databasePath);
-
-if (!fs.existsSync(databaseDirectory)) {
-  fs.mkdirSync(databaseDirectory, { recursive: true });
+// Connect to Neon PostgreSQL in production and local development.
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is missing from the environment.");
 }
 
-// Connect to SQLite.
-const db = new Database(databasePath);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 
-// Enable foreign key support.
-db.pragma("foreign_keys = ON");
+// Create the required tables if they do not already exist.
+async function initializeDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS internships (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      location TEXT NOT NULL,
+      skills JSONB NOT NULL DEFAULT '[]'::jsonb,
+      openings INTEGER NOT NULL CHECK (openings > 0)
+    )
+  `);
 
-// Improve reliability for concurrent database access.
-db.pragma("journal_mode = WAL");
-db.pragma("busy_timeout = 5000");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS applications (
+      id BIGSERIAL PRIMARY KEY,
+      internship_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      portfolio TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
-// Create internships table.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS internships (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    domain TEXT NOT NULL,
-    mode TEXT NOT NULL,
-    location TEXT NOT NULL,
-    skills TEXT NOT NULL,
-    openings INTEGER NOT NULL CHECK(openings > 0)
-  )
-`);
+      CONSTRAINT fk_internship
+        FOREIGN KEY (internship_id)
+        REFERENCES internships(id)
+        ON DELETE CASCADE,
 
-// Create applications table.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS applications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    internship_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    portfolio TEXT DEFAULT '',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_internship_application
+        UNIQUE (internship_id, email)
+    )
+  `);
 
-    FOREIGN KEY (internship_id)
-      REFERENCES internships(id)
-      ON DELETE CASCADE,
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_internships_domain
+    ON internships(domain)
+  `);
 
-    UNIQUE (internship_id, email)
-  )
-`);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_internships_mode
+    ON internships(mode)
+  `);
 
-console.log("Database connected successfully!");
-console.log(`Database location: ${databasePath}`);
+  console.log("Neon PostgreSQL connected successfully!");
+}
 
-module.exports = db;
+async function closeDatabase() {
+  await pool.end();
+}
+
+module.exports = {
+  pool,
+  initializeDatabase,
+  closeDatabase,
+};
